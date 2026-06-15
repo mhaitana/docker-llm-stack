@@ -508,23 +508,38 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
 
 def launch_containers() -> bool:
     print(f"\n{Color.CYAN}🐳 Starting the Docker stack...{Color.ENDC}")
+    
+    # Try modern 'docker compose' first
     try:
-        # Determine whether to use 'docker compose' or 'docker-compose'
         cmd = ['docker', 'compose', 'up', '-d']
         res = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
-        if res.returncode != 0:
-            # Fall back to legacy docker-compose
-            cmd = ['docker-compose', 'up', '-d']
-            res = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
-            
         if res.returncode == 0:
             print(f"\n{Color.GREEN}✅ Docker containers launched successfully!{Color.ENDC}")
             return True
         else:
-            print(f"\n{Color.FAIL}❌ Failed to start docker containers.{Color.ENDC}")
-            return False
+            print(f"\n{Color.WARNING}⚠️  'docker compose' failed. Retrying with legacy 'docker-compose'...{Color.ENDC}")
+    except FileNotFoundError:
+        print(f"\n{Color.WARNING}⚠️  'docker' executable not found on path.{Color.ENDC}")
     except Exception as e:
-        print(f"\n{Color.FAIL}❌ Error running docker command: {e}{Color.ENDC}")
+        print(f"\n{Color.WARNING}⚠️  Error running 'docker compose': {e}{Color.ENDC}")
+
+    # Fall back to legacy 'docker-compose'
+    try:
+        cmd = ['docker-compose', 'up', '-d']
+        res = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
+        if res.returncode == 0:
+            print(f"\n{Color.GREEN}✅ Docker containers launched successfully!{Color.ENDC}")
+            return True
+        else:
+            print(f"\n{Color.FAIL}❌ Failed to start containers using legacy docker-compose.{Color.ENDC}")
+            return False
+    except FileNotFoundError:
+        print(f"\n{Color.FAIL}❌ Neither 'docker compose' nor 'docker-compose' succeeded.{Color.ENDC}")
+        print("Please check that the Docker daemon is running and you have appropriate permissions.")
+        print("If you are running on Linux, you may need to run this script as sudo.")
+        return False
+    except Exception as e:
+        print(f"\n{Color.FAIL}❌ Error running fallback docker-compose command: {e}{Color.ENDC}")
         return False
 
 def wait_for_ollama(endpoint: str, timeout_seconds: int = 120) -> bool:
