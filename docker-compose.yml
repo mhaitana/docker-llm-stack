@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: webui-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-webui}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepasswordchangeit}
+      POSTGRES_DB: ${DB_NAME:-webui}
+    volumes:
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-webui} -d ${DB_NAME:-webui}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-server
+    restart: always
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ${DATA_DIR:-./data}/ollama:/root/.ollama
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui-client
+    restart: always
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-webui}:${DB_PASSWORD:-securepasswordchangeit}@${DB_HOST:-db}:${DB_PORT:-5432}/${DB_NAME:-webui}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY:-webui-super-secret-session-signing-token-change-me}
+      - WEBUI_NAME=Local LLM Stack
+    volumes:
+      - ${DATA_DIR:-./data}/open-webui:/app/backend/data
+    depends_on:
+      db:
+        condition: service_healthy
