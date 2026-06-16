@@ -452,19 +452,7 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
         # Write default openclaw.json configuration file to pass the gateway mode verification
         openclaw_config_path = os.path.join(openclaw_dir, "openclaw.json")
         if not os.path.exists(openclaw_config_path):
-            openclaw_models = []
-            for model_id in selected_models:
-                model_name = model_id
-                for m in MODEL_CATALOG:
-                    if m['id'] == model_id:
-                        model_name = m['name']
-                        break
-                openclaw_models.append({
-                    "id": model_id,
-                    "name": model_name
-                })
-                
-            ollama_api_url = "http://host.docker.internal:11434/v1" if use_native_ollama else "http://ollama:11434/v1"
+            ollama_api_url = "http://host.docker.internal:11434" if use_native_ollama else "http://ollama:11434"
             
             default_config = {
                 "gateway": {
@@ -474,16 +462,14 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
                     "providers": {
                         "ollama": {
                             "baseUrl": ollama_api_url,
-                            "apiKey": "ollama",
-                            "api": "openai-completions",
-                            "models": openclaw_models
+                            "apiKey": "ollama-local"
                         }
                     }
                 }
             }
             with open(openclaw_config_path, "w") as config_file:
                 json.dump(default_config, config_file, indent=2)
-            print(f"  ✅ Initialized OpenClaw config with your selected models: {Color.BOLD}{openclaw_config_path}{Color.ENDC}")
+            print(f"  ✅ Initialized OpenClaw config with native Ollama settings: {Color.BOLD}{openclaw_config_path}{Color.ENDC}")
     except Exception as e:
         print(f"  {Color.WARNING}⚠️  Warning pre-creating data directories: {e}{Color.ENDC}")
     
