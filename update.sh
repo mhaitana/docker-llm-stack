@@ -22,6 +22,13 @@ if [ -d .git ]; then
     git pull origin main
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Repository updated successfully.${ENDC}\n"
+        
+        # Re-run setup in headless generate-only mode to update compose & dashboard configs
+        if [ -f .env ]; then
+            echo -e "${BOLD}Regenerating stack configuration and syncing dashboard assets...${ENDC}"
+            python3 setup.py --headless --generate-only
+            echo -e "${GREEN}✅ Stack configurations and dashboard assets updated successfully.${ENDC}\n"
+        fi
     else
         echo -e "${WARNING}⚠️  Warning: Git pull failed. Continuing with container updates...${ENDC}\n"
     fi
@@ -55,6 +62,11 @@ echo -e "${GREEN}✅ Cleanup completed.${ENDC}\n"
 
 echo -e "${GREEN}${BOLD}🎉 LLM Stack updated successfully and is now running!${ENDC}"
 echo -e "Access points:"
+if [ -f .env ]; then
+    PORT_DASHBOARD_VAL=$(grep "^PORT_DASHBOARD=" .env | cut -d'=' -f2-)
+fi
+PORT_DASHBOARD_VAL=${PORT_DASHBOARD_VAL:-8000}
+echo -e "🏠  Dashboard Portal: http://localhost:$PORT_DASHBOARD_VAL"
 echo -e "📱  Open WebUI:       http://localhost:8080"
 echo -e "🤖  OpenClaw Gateway: http://localhost:18789"
 echo -e "🦙  Ollama API:       http://localhost:11434"

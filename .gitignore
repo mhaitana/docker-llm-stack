@@ -17,6 +17,7 @@ ENV/
 
 # Local Data Persistence Directories
 data/
+docker-compose.yml
 
 # IDE files
 .vscode/

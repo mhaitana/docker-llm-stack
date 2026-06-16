@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Stack Hub</title>
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Ambient glowing backgrounds -->
+    <div class="glow-bg glow-1"></div>
+    <div class="glow-bg glow-2"></div>
+    
+    <div class="container">
+        <!-- Dashboard Header -->
+        <header class="dashboard-header">
+            <div class="logo-area">
+                <span class="logo-dot"></span>
+                <h1>Local AI Stack Hub</h1>
+            </div>
+            
+            <!-- Hardware Specs Banner -->
+            <div class="hardware-banner">
+                <div class="spec-item">
+                    <span class="spec-label">OS</span>
+                    <span class="spec-val" id="spec-os">{{OS_NAME}}</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Processor</span>
+                    <span class="spec-val" id="spec-cpu">{{CPU_NAME}} ({{CPU_CORES}} Cores)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">System RAM</span>
+                    <span class="spec-val" id="spec-ram">{{RAM_GB}} GB</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">GPU / VRAM</span>
+                    <span class="spec-val" id="spec-gpu">{{GPU_NAME}} ({{GPU_VRAM}} GB)</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Content Grid -->
+        <main class="dashboard-grid">
+            
+            <!-- SECTION 1: Service Management -->
+            <section class="grid-card services-card">
+                <h2>Services Status</h2>
+                <div class="services-list">
+                    
+                    <!-- Open WebUI Service -->
+                    <div class="service-item" id="srv-webui">
+                        <div class="service-meta">
+                            <div class="status-indicator-wrapper">
+                                <span class="status-indicator pulse-offline"></span>
+                            </div>
+                            <div>
+                                <h3>Open WebUI</h3>
+                                <p class="service-desc">ChatGPT-like browser chat client</p>
+                            </div>
+                        </div>
+                        <div class="service-actions">
+                            <span class="port-label">Port 8080</span>
+                            <a href="http://localhost:8080" target="_blank" class="btn btn-primary btn-launch">Open WebUI</a>
+                        </div>
+                    </div>
+                    
+                    <!-- OpenClaw Service -->
+                    <div class="service-item" id="srv-openclaw">
+                        <div class="service-meta">
+                            <div class="status-indicator-wrapper">
+                                <span class="status-indicator pulse-offline"></span>
+                            </div>
+                            <div>
+                                <h3>OpenClaw Gateway</h3>
+                                <p class="service-desc">Autonomous AI agent controller</p>
+                                <!-- Token Copy Area -->
+                                <div class="token-container" id="openclaw-token-area">
+                                    <span class="token-label">Token:</span>
+                                    <code id="openclaw-token-value">{{OPENCLAW_TOKEN}}</code>
+                                    <button class="btn-copy" id="btn-copy-token" title="Copy Token">📋</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="service-actions">
+                            <span class="port-label">Port 18789</span>
+                            <a href="http://localhost:18789" target="_blank" class="btn btn-secondary btn-launch">Open Dashboard</a>
+                        </div>
+                    </div>
+                    
+                    <!-- Ollama Server Service -->
+                    <div class="service-item" id="srv-ollama">
+                        <div class="service-meta">
+                            <div class="status-indicator-wrapper">
+                                <span class="status-indicator pulse-offline"></span>
+                            </div>
+                            <div>
+                                <h3>Ollama Engine</h3>
+                                <p class="service-desc">Local LLM model weight server</p>
+                            </div>
+                        </div>
+                        <div class="service-actions">
+                            <span class="port-label">Port 11434</span>
+                            <a href="http://localhost:11434" target="_blank" class="btn btn-secondary btn-launch">API Health</a>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+
+            <!-- SECTION 2: Models Catalog & Manager -->
+            <section class="grid-card models-card">
+                <h2>Local Models</h2>
+                
+                <!-- Models Pull Command Box -->
+                <div class="model-pull-box">
+                    <form id="pull-model-form">
+                        <input type="text" id="model-tag-input" placeholder="Enter model name (e.g. llama3.2:3b)" required>
+                        <button type="submit" class="btn btn-primary" id="btn-pull-submit">Pull Model</button>
+                    </form>
+                    
+                    <!-- Progress Bar (Initially Hidden) -->
+                    <div class="pull-progress-container" id="pull-progress-container">
+                        <div class="progress-info">
+                            <span id="pull-status-text">Connecting to Ollama...</span>
+                            <span id="pull-percent-text">0.0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                        </div>
+                        <div class="progress-meta">
+                            <span id="pull-speed-text">0 MB/s</span>
+                            <span id="pull-downloaded-text">0 / 0 MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Installed Models List -->
+                <div class="models-list-wrapper">
+                    <div class="loading-spinner" id="models-loading">
+                        <div class="spinner"></div>
+                        <p>Loading installed models...</p>
+                    </div>
+                    <div class="no-models-card" id="no-models-msg">
+                        <p>No models downloaded yet. Use the selector above to pull your first model!</p>
+                    </div>
+                    <table class="models-table" id="models-table">
+                        <thead>
+                            <tr>
+                                <th>Model Name</th>
+                                <th>Size</th>
+                                <th>Format</th>
+                                <th>Family</th>
+                            </tr>
+                        </thead>
+                        <tbody id="models-list-tbody">
+                            <!-- Dynamic Row Injection -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+        
+        <!-- Subtle Footer -->
+        <footer class="dashboard-footer">
+            <p>Persistent storage path: <code id="footer-data-dir">{{DATA_DIR}}</code></p>
+            <p>Local AI Stack Hub &bull; Matt Haitana &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
