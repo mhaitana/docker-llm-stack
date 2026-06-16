@@ -4,10 +4,11 @@ This repository provides an automated, hardware-aware stack for hosting a local 
 
 ## Architecture
 
-The stack consists of three core components:
+The stack consists of four core components:
 1. **Ollama**: Serves open-source LLMs (Llama 3, DeepSeek-R1, Qwen, Gemma, etc.) with hardware-accelerated inference.
 2. **Open WebUI**: A feature-rich browser client that mirrors the ChatGPT interface, with built-in user management, settings, and conversation memory.
-3. **PostgreSQL**: A resilient, dedicated relational database for storing Open WebUI conversation logs, settings, and user accounts.
+3. **PostgreSQL**: A resilient, dedicated database for storing Open WebUI conversation logs, settings, and user accounts.
+4. **OpenClaw**: An open-source autonomous AI agent gateway that connects your local LLMs to system tools (filesystem, terminal, web search) and communication channels.
 
 ```
        [ Browser Client ]
@@ -16,8 +17,10 @@ The stack consists of three core components:
       [ Open WebUI Client ] ──(Save Chats)──► [ PostgreSQL Database ]
                │
                ▼ (Port 11434)
-         [ Ollama API ]
- (Linux/GPU Docker OR macOS Native)
+         [ Ollama API ] ◄────(Query Models)──── [ OpenClaw Gateway ] (Port 18789)
+  (Linux/GPU Docker OR macOS Native)                │
+                                                    ▼
+                                     [ Local Files / Terminal / Web Tools ]
 ```
 
 ---
@@ -73,10 +76,18 @@ Ensure you have the following installed:
    - Automatically configure environment variables and compose files.
    - Boot container services and auto-pull selected models.
 
-### Accessing the Client
+### Accessing the Clients
 
 - **Open WebUI**: [http://localhost:8080](http://localhost:8080)
+- **OpenClaw Dashboard**: [http://localhost:18789](http://localhost:18789) (Securely bound to localhost. Access using the `OPENCLAW_GATEWAY_TOKEN` found in your generated `.env` file).
 - **Ollama API**: [http://localhost:11434](http://localhost:11434)
+
+#### Connecting OpenClaw to your local LLMs:
+1. Open the **OpenClaw Dashboard** at `http://localhost:18789` and log in using your gateway token.
+2. Go to **LLM Providers** and add a custom OpenAI-compatible provider:
+   - **Provider URL**: `http://ollama:11434/v1` (if running Ollama in Docker) or `http://host.docker.internal:11434/v1` (if running native Ollama on macOS).
+   - **API Key**: Any string (e.g., `ollama`).
+3. Select your model (e.g., `deepseek-r1:14b` or `qwen2.5:14b`) to start executing tasks.
 
 *Note: The first user to register on Open WebUI [http://localhost:8080](http://localhost:8080) will automatically be granted Owner/Administrator privileges. From there, you can enable/disable user registrations under Admin settings.*
 
@@ -85,6 +96,13 @@ Ensure you have the following installed:
 ## CLI & Manual Commands
 
 If you prefer to manage the services or pull models manually:
+
+### Updating & Patching the Stack
+To automatically pull the latest git repository updates, download the newest Docker image updates (for Open WebUI, OpenClaw, PostgreSQL, and Ollama), and restart all services:
+```bash
+chmod +x update.sh
+./update.sh
+```
 
 ### Manage Docker Containers
 ```bash

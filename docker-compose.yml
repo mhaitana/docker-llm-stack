@@ -4,39 +4,50 @@ services:
     container_name: webui-postgres
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-webui}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepasswordchangeit}
-      POSTGRES_DB: ${DB_NAME:-webui}
+      POSTGRES_USER: webui
+      POSTGRES_PASSWORD: webui-secure-password-9696
+      POSTGRES_DB: webui
     volumes:
-      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-webui} -d ${DB_NAME:-webui}"]
+      test: ["CMD-SHELL", "pg_isready -U webui -d webui"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-server
-    restart: always
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    volumes:
-      - ${DATA_DIR:-./data}/ollama:/root/.ollama
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui-client
     restart: always
     ports:
-      - "${PORT:-8080}:8080"
+      - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-webui}:${DB_PASSWORD:-securepasswordchangeit}@${DB_HOST:-db}:${DB_PORT:-5432}/${DB_NAME:-webui}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY:-webui-super-secret-session-signing-token-change-me}
+      - DATABASE_URL=postgresql://webui:webui-secure-password-9696@db:5432/webui
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - WEBUI_SECRET_KEY=secret-1781609696
       - WEBUI_NAME=Local LLM Stack
     volumes:
-      - ${DATA_DIR:-./data}/open-webui:/app/backend/data
+      - ./data/open-webui:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
+
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw-gateway
+    restart: always
+    ports:
+      - "127.0.0.1:18789:18789"
+    environment:
+      - HOME=/home/node
+      - OPENCLAW_HOME=/home/node
+      - OPENCLAW_STATE_DIR=/home/node/.openclaw
+      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+      - OPENCLAW_CONFIG_DIR=/home/node/.openclaw
+      - OPENCLAW_WORKSPACE_DIR=/home/node/.openclaw/workspace
+      - OPENCLAW_GATEWAY_TOKEN=claw-token-1781609696
+    volumes:
+      - ./data/openclaw:/home/node/.openclaw
+
