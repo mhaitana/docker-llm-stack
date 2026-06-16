@@ -471,7 +471,8 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
                     "defaults": {
                         "model": {
                             "primary": f"ollama/{selected_models[0]}" if selected_models else ""
-                        }
+                        },
+                        "models": [f"ollama/{m}" for m in selected_models] if selected_models else []
                     }
                 }
             }
