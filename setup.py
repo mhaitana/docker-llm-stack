@@ -465,6 +465,13 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
                             "apiKey": "ollama-local"
                         }
                     }
+                },
+                "agents": {
+                    "defaults": {
+                        "model": {
+                            "primary": f"ollama/{selected_models[0]}" if selected_models else ""
+                        }
+                    }
                 }
             }
             with open(openclaw_config_path, "w") as config_file:
@@ -571,6 +578,12 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
     compose_yaml.append(f"      - OPENCLAW_GATEWAY_TOKEN={openclaw_token}")
     compose_yaml.append("    volumes:")
     compose_yaml.append(f"      - {data_dir}/openclaw:/home/node/.openclaw")
+    
+    # Extra hosts needed for resolving host.docker.internal on native setup
+    if use_native_ollama:
+        compose_yaml.append("    extra_hosts:")
+        compose_yaml.append("      - \"host.docker.internal:host-gateway\"")
+        
     compose_yaml.append("")
     
     # Write custom file
