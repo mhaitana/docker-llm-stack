@@ -545,36 +545,69 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], openclaw_strategy: s
         # Add provider wildcard to catalog so newly pulled models are automatically allowed
         openclaw_models_catalog["ollama/*"] = {}
             
-        default_config = {
-            "gateway": {
-                "mode": "local"
-            },
-            "models": {
-                "providers": {
-                    "ollama": {
-                        "baseUrl": ollama_api_url,
-                        "apiKey": "ollama-local"
-                    }
-                }
-            },
-            "agents": {
-                "defaults": {
-                    "model": {
-                        "primary": f"ollama/{selected_models[0]}" if selected_models else ""
-                    },
-                    "models": openclaw_models_catalog
-                }
-            }
-        }
-        
         for config_path in openclaw_config_paths:
-            if not os.path.exists(config_path):
-                try:
-                    with open(config_path, "w") as config_file:
-                        json.dump(default_config, config_file, indent=2)
-                    print(f"  ✅ Initialized OpenClaw config: {Color.BOLD}{config_path}{Color.ENDC}")
-                except Exception as e:
-                    print(f"  {Color.WARNING}⚠️  Warning writing config to {config_path}: {e}{Color.ENDC}")
+            try:
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                if os.path.exists(config_path):
+                    with open(config_path, "r") as config_file:
+                        config = json.load(config_file)
+                else:
+                    config = {}
+                
+                # Update/set gateway settings
+                if "gateway" not in config:
+                    config["gateway"] = {}
+                config["gateway"]["mode"] = "local"
+                
+                if "controlUi" not in config["gateway"]:
+                    config["gateway"]["controlUi"] = {}
+                
+                allowed_origins = [
+                    f"http://localhost:{dashboard_port}",
+                    f"http://127.0.0.1:{dashboard_port}",
+                    f"http://localhost:{port}",
+                    f"http://127.0.0.1:{port}",
+                    f"http://localhost:{openclaw_port}",
+                    f"http://127.0.0.1:{openclaw_port}"
+                ]
+                # Merge existing allowedOrigins if present
+                existing_origins = config["gateway"]["controlUi"].get("allowedOrigins", [])
+                for origin in allowed_origins:
+                    if origin not in existing_origins:
+                        existing_origins.append(origin)
+                config["gateway"]["controlUi"]["allowedOrigins"] = existing_origins
+                
+                # Update models settings
+                if "models" not in config:
+                    config["models"] = {}
+                if "providers" not in config["models"]:
+                    config["models"]["providers"] = {}
+                if "ollama" not in config["models"]["providers"]:
+                    config["models"]["providers"]["ollama"] = {}
+                config["models"]["providers"]["ollama"]["baseUrl"] = ollama_api_url
+                config["models"]["providers"]["ollama"]["apiKey"] = "ollama-local"
+                
+                if "agents" not in config:
+                    config["agents"] = {}
+                if "defaults" not in config["agents"]:
+                    config["agents"]["defaults"] = {}
+                if "model" not in config["agents"]["defaults"]:
+                    config["agents"]["defaults"]["model"] = {}
+                if not config["agents"]["defaults"]["model"].get("primary") and selected_models:
+                    config["agents"]["defaults"]["model"]["primary"] = f"ollama/{selected_models[0]}"
+                    
+                # Rebuild/merge models allowlist catalog
+                if "models" not in config["agents"]["defaults"]:
+                    config["agents"]["defaults"]["models"] = {}
+                for m in selected_models:
+                    config["agents"]["defaults"]["models"][f"ollama/{m}"] = {}
+                config["agents"]["defaults"]["models"]["ollama/*"] = {}
+                
+                with open(config_path, "w") as config_file:
+                    json.dump(config, config_file, indent=2)
+                print(f"  ✅ Configured OpenClaw config: {Color.BOLD}{config_path}{Color.ENDC}")
+            except Exception as e:
+                print(f"  {Color.WARNING}⚠️  Warning writing config to {config_path}: {e}{Color.ENDC}")
                     
     except Exception as e:
         print(f"  {Color.WARNING}⚠️  Warning pre-creating data directories: {e}{Color.ENDC}")
