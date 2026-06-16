@@ -88,6 +88,9 @@ async function fetchModels() {
                 <td>${size}</td>
                 <td><span class="port-label">${format}</span></td>
                 <td>${family}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm btn-delete-model" data-model="${name}">Remove</button>
+                </td>
             `;
             modelsListTbody.appendChild(row);
         });
@@ -174,9 +177,18 @@ async function pullModel(modelName) {
         }
         
         // Success
-        pullStatusText.textContent = 'Success! Model downloaded.';
+        pullStatusText.textContent = 'Success! Syncing OpenClaw...';
         progressBarFill.style.width = '100%';
         pullPercentText.textContent = '100%';
+        
+        try {
+            await fetch('/api/sync-openclaw', { method: 'POST' });
+            pullStatusText.textContent = 'Success! Model synced with OpenClaw.';
+        } catch (e) {
+            console.error('Failed to sync OpenClaw:', e);
+            pullStatusText.textContent = 'Success! Model downloaded (sync failed).';
+        }
+        
         setTimeout(() => {
             pullProgressContainer.style.display = 'none';
             btnPullSubmit.disabled = false;
@@ -217,6 +229,51 @@ if (copyBtn && tokenVal) {
             copyBtn.textContent = '📋';
         }, 2000);
     });
+}
+
+// Handle model deletion event delegation
+modelsListTbody.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('btn-delete-model')) {
+        const modelName = e.target.getAttribute('data-model');
+        if (confirm(`Are you sure you want to remove the model "${modelName}"?`)) {
+            await deleteModel(modelName, e.target);
+        }
+    }
+});
+
+// Delete Model API caller
+async function deleteModel(modelName, buttonElement) {
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = 'Removing...';
+    
+    try {
+        const response = await fetch(`${OLLAMA_ENDPOINT}/api/delete`, {
+            method: 'DELETE',
+            body: JSON.stringify({ name: modelName }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || 'Delete failed');
+        }
+        
+        // Refresh models list
+        await fetchModels();
+        
+        // Sync with OpenClaw catalog
+        try {
+            await fetch('/api/sync-openclaw', { method: 'POST' });
+        } catch (e) {
+            console.error('Failed to sync OpenClaw catalog:', e);
+        }
+    } catch (err) {
+        console.error('Error deleting model:', err);
+        alert(`Failed to delete model: ${err.message}`);
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+    }
 }
 
 // --- Initial Startup Loops ---

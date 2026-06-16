@@ -481,7 +481,7 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], openclaw_strategy: s
         os.makedirs(runtime_dashboard_dir, exist_ok=True)
         
         # Copy dashboard files
-        for filename in ["index.html", "style.css", "app.js"]:
+        for filename in ["index.html", "style.css", "app.js", "server.py"]:
             src = os.path.join("dashboard", filename)
             dest = os.path.join(runtime_dashboard_dir, filename)
             if os.path.exists(src):
@@ -688,13 +688,28 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], openclaw_strategy: s
         
     # Dashboard Service
     compose_yaml.append("  dashboard:")
-    compose_yaml.append("    image: nginx:alpine")
+    compose_yaml.append("    image: python:3.11-alpine")
     compose_yaml.append("    container_name: local-ai-dashboard")
     compose_yaml.append("    restart: always")
     compose_yaml.append("    ports:")
-    compose_yaml.append(f"      - \"{dashboard_port}:80\"")
+    compose_yaml.append(f"      - \"{dashboard_port}:8000\"")
     compose_yaml.append("    volumes:")
-    compose_yaml.append(f"      - {data_dir}/dashboard:/usr/share/nginx/html:ro")
+    compose_yaml.append(f"      - {data_dir}/dashboard:/app")
+    compose_yaml.append(f"      - {data_dir}/openclaw:/data/openclaw")
+    
+    if openclaw_strategy == "native":
+        user_home = os.path.expanduser("~")
+        compose_yaml.append(f"      - {user_home}/.openclaw:/native-openclaw")
+        
+    compose_yaml.append("    environment:")
+    if use_native_ollama:
+        compose_yaml.append("      - OLLAMA_ENDPOINT=http://host.docker.internal:11434")
+    else:
+        compose_yaml.append("      - OLLAMA_ENDPOINT=http://ollama:11434")
+        
+    compose_yaml.append("    extra_hosts:")
+    compose_yaml.append("      - \"host.docker.internal:host-gateway\"")
+    compose_yaml.append("    command: python3 /app/server.py")
     compose_yaml.append("")
 
     # Write custom file

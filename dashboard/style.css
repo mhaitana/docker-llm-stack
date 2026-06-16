@@ -521,3 +521,25 @@ h2 {
 .btn-copy:active {
     transform: scale(0.9);
 }
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
+    color: var(--white);
+    box-shadow: 0 4px 10px rgba(255, 77, 77, 0.2);
+}
+
+.btn-danger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(255, 77, 77, 0.35);
+    filter: brightness(1.1);
+}
+
+.btn-danger:active {
+    transform: scale(0.97);
+}
