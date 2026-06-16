@@ -353,6 +353,7 @@ def select_models(hw: Dict) -> List[str]:
         print(f"    {Color.GRAY}{model['description']}{Color.ENDC}\n")
         
     print(f"Enter numbers of models to select (separated by commas, e.g., '1,4' or '4').")
+    print(f"  {Color.CYAN}ℹ️  Note: The first model you select will be set as the default for OpenClaw.{Color.ENDC}")
     print(f"Leave empty to skip model auto-pull and configure manually later.")
     
     while True:
