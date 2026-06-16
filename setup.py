@@ -312,6 +312,26 @@ def setup_mac_options(hw: Dict) -> str:
         else:
             print(f"{Color.FAIL}Invalid option. Enter 1 or 2.{Color.ENDC}")
 
+def setup_openclaw_options(hw: Dict) -> str:
+    """Returns 'native' or 'docker' for OpenClaw gateway configuration."""
+    print(f"\n{Color.BOLD}🤖 OpenClaw Gateway Execution Mode{Color.ENDC}")
+    print("Choose how you would like to run the OpenClaw Gateway:")
+    print(f"  {Color.GREEN}1) [RECOMMENDED for Host Control] Native Host Mode{Color.ENDC}")
+    print("     - Runs OpenClaw directly on your Mac/host machine.")
+    print("     - Allows the AI agent to execute terminal commands, edit files, and control your computer.")
+    print("  2) Fully Containerized (Isolated in Docker)")
+    print("     - Runs OpenClaw inside an isolated Docker container.")
+    print("     - Secure and isolated, but the agent cannot access or control your host computer.")
+    
+    while True:
+        choice = input(f"\nSelect OpenClaw execution mode (1 or 2) [default: 1]: ").strip()
+        if not choice or choice in ('1', 'native'):
+            return "native"
+        elif choice == '2' or choice == 'docker':
+            return "docker"
+        else:
+            print(f"{Color.FAIL}Invalid option. Enter 1 or 2.{Color.ENDC}")
+
 def select_models(hw: Dict) -> List[str]:
     print(f"{Color.BOLD}🤖 LLM Model Selection Catalog{Color.ENDC}")
     print(f"Select models to automatically pull during setup.")
@@ -402,7 +422,7 @@ def read_existing_env() -> Dict[str, str]:
             pass
     return env_data
 
-def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: List[str], data_dir: str, openclaw_token: str):
+def generate_configs(hw: Dict, mac_strategy: Optional[str], openclaw_strategy: str, selected_models: List[str], data_dir: str, openclaw_token: str):
     print(f"\n{Color.CYAN}⚙️  Generating customized environment and configuration files...{Color.ENDC}")
     
     # 1. Generate .env file
@@ -450,35 +470,63 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
         openclaw_dir = os.path.join(resolved_data_dir, "openclaw")
         os.makedirs(openclaw_dir, exist_ok=True)
         
-        # Write default openclaw.json configuration file to pass the gateway mode verification
-        openclaw_config_path = os.path.join(openclaw_dir, "openclaw.json")
-        if not os.path.exists(openclaw_config_path):
+        # Determine ollama baseUrl based on openclaw execution strategy
+        if openclaw_strategy == "native":
+            ollama_api_url = "http://localhost:11434"
+        else:
             ollama_api_url = "http://host.docker.internal:11434" if use_native_ollama else "http://ollama:11434"
             
-            default_config = {
-                "gateway": {
-                    "mode": "local"
-                },
-                "models": {
-                    "providers": {
-                        "ollama": {
-                            "baseUrl": ollama_api_url,
-                            "apiKey": "ollama-local"
-                        }
-                    }
-                },
-                "agents": {
-                    "defaults": {
-                        "model": {
-                            "primary": f"ollama/{selected_models[0]}" if selected_models else ""
-                        },
-                        "models": [f"ollama/{m}" for m in selected_models] if selected_models else []
+        # Write default openclaw.json configuration file to pass the gateway mode verification
+        openclaw_config_paths = []
+        project_config_path = os.path.join(openclaw_dir, "openclaw.json")
+        openclaw_config_paths.append(project_config_path)
+        
+        if openclaw_strategy == "native":
+            try:
+                user_home = os.path.expanduser("~")
+                native_openclaw_dir = os.path.join(user_home, ".openclaw")
+                os.makedirs(native_openclaw_dir, exist_ok=True)
+                native_config_path = os.path.join(native_openclaw_dir, "openclaw.json")
+                openclaw_config_paths.append(native_config_path)
+            except Exception as e:
+                print(f"  {Color.WARNING}⚠️  Warning pre-creating user's native ~/.openclaw directory: {e}{Color.ENDC}")
+                
+        # Map selected models to empty objects in the dictionary catalog
+        openclaw_models_catalog = {}
+        for m in selected_models:
+            openclaw_models_catalog[f"ollama/{m}"] = {}
+            
+        default_config = {
+            "gateway": {
+                "mode": "local"
+            },
+            "models": {
+                "providers": {
+                    "ollama": {
+                        "baseUrl": ollama_api_url,
+                        "apiKey": "ollama-local"
                     }
                 }
+            },
+            "agents": {
+                "defaults": {
+                    "model": {
+                        "primary": f"ollama/{selected_models[0]}" if selected_models else ""
+                    },
+                    "models": openclaw_models_catalog
+                }
             }
-            with open(openclaw_config_path, "w") as config_file:
-                json.dump(default_config, config_file, indent=2)
-            print(f"  ✅ Initialized OpenClaw config with native Ollama settings: {Color.BOLD}{openclaw_config_path}{Color.ENDC}")
+        }
+        
+        for config_path in openclaw_config_paths:
+            if not os.path.exists(config_path):
+                try:
+                    with open(config_path, "w") as config_file:
+                        json.dump(default_config, config_file, indent=2)
+                    print(f"  ✅ Initialized OpenClaw config: {Color.BOLD}{config_path}{Color.ENDC}")
+                except Exception as e:
+                    print(f"  {Color.WARNING}⚠️  Warning writing config to {config_path}: {e}{Color.ENDC}")
+                    
     except Exception as e:
         print(f"  {Color.WARNING}⚠️  Warning pre-creating data directories: {e}{Color.ENDC}")
     
@@ -563,31 +611,32 @@ def generate_configs(hw: Dict, mac_strategy: Optional[str], selected_models: Lis
         
     compose_yaml.append("")
     
-    # OpenClaw Gateway Service
-    compose_yaml.append("  openclaw-gateway:")
-    compose_yaml.append("    image: ghcr.io/openclaw/openclaw:latest")
-    compose_yaml.append("    container_name: openclaw-gateway")
-    compose_yaml.append("    restart: always")
-    compose_yaml.append("    ports:")
-    compose_yaml.append(f"      - \"127.0.0.1:{openclaw_port}:18789\"")
-    compose_yaml.append("    environment:")
-    compose_yaml.append("      - HOME=/home/node")
-    compose_yaml.append("      - OPENCLAW_HOME=/home/node")
-    compose_yaml.append("      - OPENCLAW_STATE_DIR=/home/node/.openclaw")
-    compose_yaml.append("      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json")
-    compose_yaml.append("      - OPENCLAW_CONFIG_DIR=/home/node/.openclaw")
-    compose_yaml.append("      - OPENCLAW_WORKSPACE_DIR=/home/node/.openclaw/workspace")
-    compose_yaml.append(f"      - OPENCLAW_GATEWAY_TOKEN={openclaw_token}")
-    compose_yaml.append("    volumes:")
-    compose_yaml.append(f"      - {data_dir}/openclaw:/home/node/.openclaw")
-    
-    # Extra hosts needed for resolving host.docker.internal on native setup
-    if use_native_ollama:
-        compose_yaml.append("    extra_hosts:")
-        compose_yaml.append("      - \"host.docker.internal:host-gateway\"")
+    # OpenClaw Gateway Service (only if docker mode is selected)
+    if openclaw_strategy == "docker":
+        compose_yaml.append("  openclaw-gateway:")
+        compose_yaml.append("    image: ghcr.io/openclaw/openclaw:latest")
+        compose_yaml.append("    container_name: openclaw-gateway")
+        compose_yaml.append("    restart: always")
+        compose_yaml.append("    ports:")
+        compose_yaml.append(f"      - \"127.0.0.1:{openclaw_port}:18789\"")
+        compose_yaml.append("    environment:")
+        compose_yaml.append("      - HOME=/home/node")
+        compose_yaml.append("      - OPENCLAW_HOME=/home/node")
+        compose_yaml.append("      - OPENCLAW_STATE_DIR=/home/node/.openclaw")
+        compose_yaml.append("      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json")
+        compose_yaml.append("      - OPENCLAW_CONFIG_DIR=/home/node/.openclaw")
+        compose_yaml.append("      - OPENCLAW_WORKSPACE_DIR=/home/node/.openclaw/workspace")
+        compose_yaml.append(f"      - OPENCLAW_GATEWAY_TOKEN={openclaw_token}")
+        compose_yaml.append("    volumes:")
+        compose_yaml.append(f"      - {data_dir}/openclaw:/home/node/.openclaw")
         
-    compose_yaml.append("")
-    
+        # Extra hosts needed for resolving host.docker.internal on native setup
+        if use_native_ollama:
+            compose_yaml.append("    extra_hosts:")
+            compose_yaml.append("      - \"host.docker.internal:host-gateway\"")
+            
+        compose_yaml.append("")
+        
     # Write custom file
     with open("docker-compose.yml", "w") as f:
         f.write("\n".join(compose_yaml) + "\n")
@@ -686,6 +735,89 @@ def pull_ollama_model(endpoint: str, model_id: str):
         print(f"\n{Color.FAIL}  ❌ Error pulling {model_id}: {e}{Color.ENDC}")
         print("  Please check network connectivity or run: ollama pull " + model_id)
 
+def update_openclaw_models_catalog(data_dir: str, ollama_endpoint: str, openclaw_strategy: str):
+    print(f"\n{Color.CYAN}🔄 Syncing all available Ollama models with OpenClaw catalog...{Color.ENDC}")
+    try:
+        # Fetch models from Ollama API
+        req = urllib.request.Request(f"{ollama_endpoint}/api/tags")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            models = data.get('models', [])
+            
+        if not models:
+            print(f"  {Color.WARNING}⚠️  No models found in Ollama. Skipping catalog update.{Color.ENDC}")
+            return
+            
+        model_names = [m['name'] for m in models]
+        print(f"  Found {len(model_names)} model(s) in Ollama: {', '.join(model_names)}")
+        
+        # Determine config paths
+        config_paths = []
+        project_config_path = os.path.join(data_dir, "openclaw", "openclaw.json")
+        
+        if openclaw_strategy == "native":
+            user_home = os.path.expanduser("~")
+            native_config_path = os.path.join(user_home, ".openclaw", "openclaw.json")
+            config_paths.append(native_config_path)
+            # Sync to project config as well if it exists or for consistency
+            config_paths.append(project_config_path)
+        else:
+            config_paths.append(project_config_path)
+            
+        for config_path in config_paths:
+            # Skip if native path cannot be created/written or if project path doesn't exist
+            if config_path == project_config_path and not os.path.exists(os.path.dirname(config_path)):
+                continue
+                
+            try:
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                if os.path.exists(config_path):
+                    with open(config_path, "r") as f:
+                        config = json.load(f)
+                else:
+                    config = {}
+                    
+                # Ensure structural dictionaries exist
+                if "agents" not in config:
+                    config["agents"] = {}
+                if "defaults" not in config["agents"]:
+                    config["agents"]["defaults"] = {}
+                if "model" not in config["agents"]["defaults"]:
+                    config["agents"]["defaults"]["model"] = {}
+                    
+                # Update models allowlist catalog as a dictionary
+                openclaw_models_catalog = {}
+                for m in model_names:
+                    openclaw_models_catalog[f"ollama/{m}"] = {}
+                config["agents"]["defaults"]["models"] = openclaw_models_catalog
+                
+                # Set primary model if not set or if current primary is not in the list
+                current_primary = config["agents"]["defaults"]["model"].get("primary", "")
+                if not current_primary or not any(current_primary.endswith(m) for m in model_names):
+                    config["agents"]["defaults"]["model"]["primary"] = f"ollama/{model_names[0]}"
+                    
+                # Save updated config
+                with open(config_path, "w") as f:
+                    json.dump(config, f, indent=2)
+                    
+                print(f"  ✅ Updated OpenClaw catalog: {Color.BOLD}{config_path}{Color.ENDC}")
+            except Exception as e:
+                print(f"  {Color.WARNING}⚠️  Warning updating OpenClaw catalog at {config_path}: {e}{Color.ENDC}")
+                
+        # Restart OpenClaw gateway if running in Docker
+        if openclaw_strategy == "docker":
+            print(f"  🔄 Restarting OpenClaw gateway container to apply updates...")
+            cmd = ['docker', 'compose', 'restart', 'openclaw-gateway']
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                cmd = ['docker-compose', 'restart', 'openclaw-gateway']
+                subprocess.run(cmd, capture_output=True, text=True)
+            print(f"  ✅ OpenClaw gateway reloaded.")
+        else:
+            print(f"  ℹ️  Note: OpenClaw is configured for native mode. If your native daemon/service is running, please restart it to reload the catalog.")
+    except Exception as e:
+        print(f"  {Color.WARNING}⚠️  Warning updating OpenClaw catalog: {e}{Color.ENDC}")
+
 def main():
     clear_screen()
     print_banner()
@@ -702,6 +834,9 @@ def main():
     mac_strategy = None
     if hw['os'] == 'Darwin':
         mac_strategy = setup_mac_options(hw)
+        
+    # 3b. OpenClaw execution mode check
+    openclaw_strategy = setup_openclaw_options(hw)
         
     # 4. Model Selection
     selected_models = select_models(hw)
@@ -724,7 +859,7 @@ def main():
     # 6. Generate Configuration Files
     existing_env = read_existing_env()
     openclaw_token = existing_env.get("OPENCLAW_GATEWAY_TOKEN") or os.getenv("OPENCLAW_GATEWAY_TOKEN") or ("claw-token-" + str(int(time.time())))
-    generate_configs(hw, mac_strategy, selected_models, data_dir, openclaw_token)
+    generate_configs(hw, mac_strategy, openclaw_strategy, selected_models, data_dir, openclaw_token)
     
     # 7. Launch Docker Containers
     if not launch_containers():
@@ -743,20 +878,37 @@ def main():
         if wait_for_ollama(ollama_endpoint):
             for model in selected_models:
                 pull_ollama_model(ollama_endpoint, model)
+            # Sync all available models from Ollama API to OpenClaw config
+            update_openclaw_models_catalog(data_dir, ollama_endpoint, openclaw_strategy)
         else:
             print(f"\n{Color.FAIL}❌ Ollama API did not become available in time. Skipping automatic pulls.{Color.ENDC}")
             print(f"You can pull models manually using: {Color.BOLD}docker exec -it ollama-server ollama pull <model-name>{Color.ENDC}")
+    else:
+        # Even if no models were selected to pull, try to sync existing ones
+        if wait_for_ollama(ollama_endpoint, timeout_seconds=10):
+            update_openclaw_models_catalog(data_dir, ollama_endpoint, openclaw_strategy)
             
     # 9. Finished!
     print(f"\n{Color.GREEN}{Color.BOLD}🎉 Setup Completed Successfully!{Color.ENDC}")
     print(f"============================================================")
     print(f"📱  {Color.BOLD}Open WebUI:{Color.ENDC} http://localhost:8080")
-    print(f"🤖  {Color.BOLD}OpenClaw Gateway:{Color.ENDC} http://localhost:18789")
-    print(f"🔑  {Color.BOLD}OpenClaw Token:{Color.ENDC} {openclaw_token}")
+    if openclaw_strategy == "docker":
+        print(f"🤖  {Color.BOLD}OpenClaw Gateway (Docker):{Color.ENDC} http://localhost:18789")
+        print(f"🔑  {Color.BOLD}OpenClaw Token:{Color.ENDC} {openclaw_token}")
+    else:
+        print(f"🤖  {Color.BOLD}OpenClaw Gateway (Native):{Color.ENDC} Port 18789 (run command below)")
     print(f"🦙  {Color.BOLD}Ollama API:{Color.ENDC} {ollama_endpoint}")
     print(f"🗄️   {Color.BOLD}PostgreSQL DB:{Color.ENDC} Running on container 'webui-postgres'")
     print(f"============================================================")
     
+    if openclaw_strategy == "native":
+        print(f"\n{Color.CYAN}{Color.BOLD}👉 HOW TO RUN OPENCLAW NATIVELY (to control your Mac):{Color.ENDC}")
+        print("1. Install OpenClaw natively on your host machine if you haven't already:")
+        print(f"   {Color.GREEN}curl -fsSL https://openclaw.ai/install.sh | bash{Color.ENDC}")
+        print("2. Launch the OpenClaw onboarding and daemon process:")
+        print(f"   {Color.GREEN}openclaw onboard --install-daemon{Color.ENDC}")
+        print("   (Since setup.py pre-configured ~/.openclaw/openclaw.json, it will connect to your local Ollama automatically!)")
+        
     if hw['os'] == 'Darwin' and mac_strategy == 'native':
         print(f"\n{Color.WARNING}{Color.BOLD}IMPORTANT NATIVE OLLAMA NOTE:{Color.ENDC}")
         print("Since you chose Native Host Ollama, please ensure Ollama is running on your Mac.")

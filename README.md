@@ -79,15 +79,31 @@ Ensure you have the following installed:
 ### Accessing the Clients
 
 - **Open WebUI**: [http://localhost:8080](http://localhost:8080)
-- **OpenClaw Dashboard**: [http://localhost:18789](http://localhost:18789) (Securely bound to localhost. Access using the `OPENCLAW_GATEWAY_TOKEN` found in your generated `.env` file).
 - **Ollama API**: [http://localhost:11434](http://localhost:11434)
+- **OpenClaw Gateway**: Runs on port `18789` (details below depending on chosen mode)
 
-#### Connecting OpenClaw to your local LLMs:
-1. Open the **OpenClaw Dashboard** at `http://localhost:18789` and log in using your gateway token.
-2. Go to **LLM Providers** and add a custom OpenAI-compatible provider:
-   - **Provider URL**: `http://ollama:11434/v1` (if running Ollama in Docker) or `http://host.docker.internal:11434/v1` (if running native Ollama on macOS).
-   - **API Key**: Any string (e.g., `ollama`).
-3. Select your model (e.g., `deepseek-r1:14b` or `qwen2.5:14b`) to start executing tasks.
+#### OpenClaw Execution Modes:
+
+Depending on the mode selected during setup, you can access and configure OpenClaw as follows:
+
+##### 1. Native Host Mode (Recommended for Host Control)
+If you chose Native Host mode, the gateway runs natively on your macOS/local machine, allowing the agent to execute terminal commands, read/write local files, and perform browser/app automation.
+*   **Installation**: Run the following command if you haven't installed it natively:
+    ```bash
+    curl -fsSL https://openclaw.ai/install.sh | bash
+    ```
+*   **Startup**: Run the onboarding/daemon setup:
+    ```bash
+    openclaw onboard --install-daemon
+    ```
+    *Note: The setup script pre-configures `~/.openclaw/openclaw.json` to automatically link local Ollama models (`http://localhost:11434`).*
+*   **Dashboard**: Access at [http://localhost:18789](http://localhost:18789).
+
+##### 2. Containerized Mode (Isolated)
+If you chose Containerized mode, the gateway runs securely inside Docker.
+*   **Startup**: Automatically starts when running `docker compose up -d`.
+*   **Dashboard**: Access at [http://localhost:18789](http://localhost:18789). Log in using the `OPENCLAW_GATEWAY_TOKEN` found in your generated `.env` file.
+*   **Ollama Connection**: The setup script pre-configures it to talk to Ollama inside Docker (`http://ollama:11434`) or native Ollama (`http://host.docker.internal:11434`).
 
 *Note: The first user to register on Open WebUI [http://localhost:8080](http://localhost:8080) will automatically be granted Owner/Administrator privileges. From there, you can enable/disable user registrations under Admin settings.*
 
