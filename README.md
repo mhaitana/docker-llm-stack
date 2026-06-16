@@ -1,27 +1,31 @@
-# 🚀 Local & Cloud LLM Stack (Docker + Ollama + Open WebUI + PostgreSQL)
+# 🚀 Local & Cloud LLM Stack (Docker + Ollama + Open WebUI + PostgreSQL + Dashboard)
 
-This repository provides an automated, hardware-aware stack for hosting a local Large Language Model (LLM) server and web interface. It includes user authentication, chat persistence, and automated optimization based on system specifications.
+This repository provides an automated, hardware-aware stack for hosting a local Large Language Model (LLM) server and web interface. It includes user authentication, chat persistence, automated optimization based on system specifications, and a centralized management dashboard.
 
 ## Architecture
 
-The stack consists of four core components:
-1. **Ollama**: Serves open-source LLMs (Llama 3, DeepSeek-R1, Qwen, Gemma, etc.) with hardware-accelerated inference.
-2. **Open WebUI**: A feature-rich browser client that mirrors the ChatGPT interface, with built-in user management, settings, and conversation memory.
-3. **PostgreSQL**: A resilient, dedicated database for storing Open WebUI conversation logs, settings, and user accounts.
-4. **OpenClaw**: An open-source autonomous AI agent gateway that connects your local LLMs to system tools (filesystem, terminal, web search) and communication channels.
+The stack consists of five core components:
+1. **Dashboard Portal**: A premium, glassmorphic landing page serving as the entry portal. Displays host hardware specs, live service health badges, pulled model lists, and supports pulling/removing models directly from the browser.
+2. **Ollama**: Serves open-source LLMs (Llama 3, DeepSeek-R1, Qwen, Gemma, etc.) with hardware-accelerated inference.
+3. **Open WebUI**: A feature-rich browser client that mirrors the ChatGPT interface, with built-in user management, settings, and conversation memory.
+4. **PostgreSQL**: A resilient, dedicated database for storing Open WebUI conversation logs, settings, and user accounts.
+5. **OpenClaw**: An open-source autonomous AI agent gateway that connects your local LLMs to system tools (filesystem, terminal, web search) and communication channels.
 
 ```
-       [ Browser Client ]
-               │ (Port 8080)
-               ▼
-      [ Open WebUI Client ] ──(Save Chats)──► [ PostgreSQL Database ]
-               │
-               ▼ (Port 11434)
-         [ Ollama API ] ◄────(Query Models)──── [ OpenClaw Gateway ] (Port 18789)
-  (Linux/GPU Docker OR macOS Native)                │
-                                                    ▼
-                                     [ Local Files / Terminal / Web Tools ]
+                              [ Browser Client ]
+                                ───┬──────────┬───
+                       (Port 8000) │          │ (Port 8080)
+                                   ▼          ▼
+                        [ Dashboard Portal ] [ Open WebUI Client ] ──(Save Chats)──► [ PostgreSQL DB ]
+                                   │                  │
+                      (Pull/Delete)│                  │
+                                   ▼                  ▼ (Port 11434)
+                             [ Ollama API ] ◄────(Query Models)──── [ OpenClaw Gateway ] (Port 18789)
+                      (Linux/GPU OR macOS Native)                     │
+                                                                      ▼
+                                                       [ Local Files / Terminal / Web ]
 ```
+
 
 ---
 
@@ -76,10 +80,17 @@ Ensure you have the following installed:
    - Automatically configure environment variables and compose files.
    - Boot container services and auto-pull selected models.
 
+#### Command-Line Options
+
+You can customize `setup.py` behavior using the following CLI flags:
+*   `--headless`: Run the setup script in non-interactive mode. It automatically detects existing strategy variables from `.env` (like `MAC_STRATEGY`, `OPENCLAW_STRATEGY`, and `SELECTED_MODELS`) or falls back to system defaults. It executes the whole configuration without prompting the user. Perfect for updates or script automation.
+*   `--generate-only`: Write the configuration files (`.env`, `docker-compose.yml`, `openclaw.json`) and synchronize the dashboard assets, but do not boot the Docker containers or trigger model pulling.
+
 ### Accessing the Clients
 
-- **Open WebUI**: [http://localhost:8080](http://localhost:8080)
-- **Ollama API**: [http://localhost:11434](http://localhost:11434)
+- **Dashboard Portal**: [http://localhost:8000](http://localhost:8000) (Your central management console to view service status, manage models, copy tokens, etc.)
+- **Open WebUI**: [http://localhost:8080](http://localhost:8080) (The main ChatGPT-like chat interface)
+- **Ollama API**: [http://localhost:11434](http://localhost:11434) (Local LLM server endpoint)
 - **OpenClaw Gateway**: Runs on port `18789` (details below depending on chosen mode)
 
 #### OpenClaw Execution Modes:
@@ -114,7 +125,9 @@ If you chose Containerized mode, the gateway runs securely inside Docker.
 If you prefer to manage the services or pull models manually:
 
 ### Updating & Patching the Stack
-To automatically pull the latest git repository updates, download the newest Docker image updates (for Open WebUI, OpenClaw, PostgreSQL, and Ollama), and restart all services:
+
+To automatically pull the latest git repository updates, update configuration files without losing your chosen strategies (using `setup.py --headless --generate-only`), download the newest Docker image updates, and recreate/restart all services:
+
 ```bash
 chmod +x update.sh
 ./update.sh
@@ -133,6 +146,9 @@ docker compose logs -f
 ```
 
 ### Pulling Models Manually
+
+You can pull and remove models directly through the **Dashboard Portal** UI at [http://localhost:8000](http://localhost:8000). Alternatively, you can use CLI commands:
+
 If running Ollama in Docker:
 ```bash
 docker exec -it ollama-server ollama pull deepseek-r1:8b
